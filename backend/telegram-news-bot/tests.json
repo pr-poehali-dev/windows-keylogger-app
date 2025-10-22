@@ -1,0 +1,26 @@
+{
+  "tests": [
+    {
+      "name": "Health check",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "status": "string",
+        "message": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Parse news endpoint exists",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "parse",
+        "url": "https://example.com"
+      },
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
