@@ -1,0 +1,39 @@
+{
+  "tests": [
+    {
+      "name": "Test OPTIONS request for CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedHeaders": {
+        "Access-Control-Allow-Origin": "*"
+      }
+    },
+    {
+      "name": "Test missing email returns 400",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "sessions": [{"id": "1", "startTime": "2025-01-01", "duration": 100, "keyCount": 50}]
+      },
+      "expectedStatus": 400,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test missing sessions returns 400",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "email": "test@example.com"
+      },
+      "expectedStatus": 400,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

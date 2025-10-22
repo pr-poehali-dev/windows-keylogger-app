@@ -4,6 +4,10 @@ import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 interface KeyStats {
   key: string;
@@ -33,6 +37,10 @@ const Index = () => {
     { key: 'N', count: 76 },
   ]);
   const [sessionTime, setSessionTime] = useState(0);
+  const [email, setEmail] = useState('');
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -89,6 +97,85 @@ const Index = () => {
   };
 
   const maxCount = Math.max(...keyStats.map(k => k.count));
+
+  const exportToCSV = () => {
+    if (sessions.length === 0) {
+      toast({
+        title: 'Нет данных',
+        description: 'Создайте хотя бы одну сессию для экспорта',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const headers = ['ID,Начало,Окончание,Длительность (сек),Количество клавиш'];
+    const rows = sessions.map(s => 
+      `${s.id},${s.startTime.toISOString()},${s.endTime?.toISOString() || 'В процессе'},${s.duration},${s.keyCount}`
+    );
+    const csv = [...headers, ...rows].join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `keyboard-logger-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: 'Экспорт завершен',
+      description: 'CSV файл успешно сохранен'
+    });
+  };
+
+  const sendToEmail = async () => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({
+        title: 'Неверный email',
+        description: 'Введите корректный адрес электронной почты',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (sessions.length === 0) {
+      toast({
+        title: 'Нет данных',
+        description: 'Создайте хотя бы одну сессию',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsSending(true);
+
+    try {
+      const response = await fetch('https://functions.poehali.dev/dc02137a-9b09-432f-a00c-c4b04c36a435', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, sessions })
+      });
+
+      if (!response.ok) throw new Error('Ошибка отправки');
+
+      toast({
+        title: 'Отправлено',
+        description: `Отчет отправлен на ${email}`
+      });
+      setIsEmailDialogOpen(false);
+      setEmail('');
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось отправить отчет',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -163,9 +250,64 @@ const Index = () => {
           </Card>
 
           <Card className="p-6 bg-card border-border">
-            <div className="flex items-center gap-3 mb-6">
-              <Icon name="History" size={24} className="text-primary" />
-              <h3 className="text-xl font-semibold text-card-foreground">История сессий</h3>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <Icon name="History" size={24} className="text-primary" />
+                <h3 className="text-xl font-semibold text-card-foreground">История сессий</h3>
+              </div>
+              {sessions.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button onClick={exportToCSV} variant="outline" size="sm">
+                    <Icon name="Download" size={16} className="mr-2" />
+                    CSV
+                  </Button>
+                  <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Icon name="Mail" size={16} className="mr-2" />
+                        Email
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Отправить отчет на почту</DialogTitle>
+                        <DialogDescription>
+                          Введите email для получения CSV файла с историей сессий
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email адрес</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            placeholder="example@mail.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                          />
+                        </div>
+                        <Button
+                          onClick={sendToEmail}
+                          disabled={isSending}
+                          className="w-full"
+                        >
+                          {isSending ? (
+                            <>
+                              <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
+                              Отправка...
+                            </>
+                          ) : (
+                            <>
+                              <Icon name="Send" size={16} className="mr-2" />
+                              Отправить
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              )}
             </div>
             <div className="space-y-3 max-h-[500px] overflow-y-auto">
               {sessions.length === 0 ? (
